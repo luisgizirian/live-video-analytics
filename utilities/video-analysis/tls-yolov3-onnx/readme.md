@@ -2,7 +2,7 @@
 
 *An alternative for scenarios where the YOLO inferencing container, will run separately from IoT Edge (i.e. you have a spare beefy (hardware capable) server you'd like to use for this intensive task; given the ammount of cameras you'll be feeding LVA with, which in turn, will demand simultaneous inferencing from this container). Although possible from a technical standpoint, if the inferencing container will run under IoT Edge's umbrella, a TLS certificate won't bring any added value. In this case, our suggestion is to walk the [regular documented path](../yolov3-onnx/readme.md)*
 
-The following instruction will enable you to build a docker container with [Yolov3](http://pjreddie.com/darknet/yolo/) [ONNX](http://onnx.ai/) model using [nginx](https://www.nginx.com/), [gunicorn](https://gunicorn.org/), [flask](https://github.com/pallets/flask), and [runit](http://smarden.org/runit/).
+The following instruction will enable you to build a docker container with [Yolov3](http://pjreddie.com/darknet/yolo/) [ONNX](http://onnx.ai/) model using [nginx](https://www.nginx.com/), [gunicorn](https://gunicorn.org/), [flask](https://github.com/pallets/flask), and [runit](http://smarden.org/runit/). The container exposes port 443 to the outside world. We'll show two ways to deal with SSL certificates; BYO Certificate and Self Signed Certificate.
 
 Note: References to third-party software in this repo are for informational and convenience purposes only. Microsoft does not endorse nor provide rights for the third-party software. For more information on third-party software please see the links provided above.
 
@@ -16,7 +16,7 @@ Note: References to third-party software in this repo are for informational and 
 1. [Install Docker](http://docs.docker.com/docker-for-windows/install/) on your machine
 2. Install [curl](http://curl.haxx.se/)
 
-## Obtain a valid TLS (a.k.a. SSL) certificate
+## BYO certificate
 
 ### Involving the IT team in the process
 It's really important to involve the right areas here. The organization you're working for, might have it's own policies in place to deal with SSL certificates related issues, such as: naming, providers, TTL (time to live), among other not/technical ones.
@@ -36,12 +36,12 @@ Reading material:
 
 ### Updating Nginx server config file
 
-Set the right names for the certificate files, to match what you've copied to the `/certs` folder at Host computer level. The file youi need to update is [yolov3-app.conf](yolov3-app.conf)
+Set the right names for the certificate files, to match what you've copied to the `/certs` folder at Host computer level. The file you need to update is [yolov3-app.conf](yolov3-app.conf)
 
-### Building the docker container
+### Building, publishing and running the docker container
 After getting a certificate, copying its pieces and updating the nginx configuration file, now comes the time to put the container to work.
 
-`sudo docker run -d -p 443:443 --name secureyolov3 --mount type=bind,source=/certs,target=/certs myregistry.azurecr.io/secureyolov3:1`
+`sudo docker run -d -p 443:443 --name tls-yolov3 --mount type=bind,source=/certs,target=/certs myregistry.azurecr.io/secureyolov3:1`
 
 Let's decompose it a bit:
 
@@ -50,20 +50,76 @@ Let's decompose it a bit:
 * `registry/image:tag`: replace this with the corresponding location/image:tag where you've pushed the image built fro `Dockerfile`
 
 ### Updating references into Topologies, to target the HTTPS inferencing container address
+The topology must define a YOLO inferencing:
 
-Build the container image (should take some minutes) by running the following docker command from a command window in that directory
-
-```bash
-    docker build . -t yolov3-onnx:latest
+* Url Parameter
+```
+      {
+        "name": "inferencingUrl",
+        "type": "String",
+        "description": "inferencing Url",
+        "default": "https://<REPLACE-WITH-IP-NAME>/score"
+      },
+```
+* Configuration
+```
+        "@type": "#Microsoft.Media.MediaGraphHttpExtension",
+        "name": "inferenceClient",
+        "endpoint": {
+          "@type": "#Microsoft.Media.MediaGraphTlsEndpoint",
+          "url": "${inferencingUrl}",
+          "credentials": {
+            "@type": "#Microsoft.Media.MediaGraphUsernamePasswordCredentials",
+            "username": "${inferencingUserName}",
+            "password": "${inferencingPassword}"
+          }
+        },
 ```
 
-## Running and testing
+## The Self-Signed certificate way
+Shorter, yes. Use it wisely and consider that real-world production scenarios, may require a valid CA issued certificate instead.
 
-Run the container using the following docker command
+### Find out the network reachable IP address or Server's name
+With that data, head to the [Dockerfile (for Self-Signed)](Dockerfile.ss), and replace where's indicated.
 
-```bash
-    docker run  --name my_yolo_container -p 80:80 -d  -i yolov3-onnx:latest
+### Building, publishing and running the docker container
+After getting a certificate, copying its pieces and updating the nginx configuration file, now comes the time to put the container to work.
+
+`sudo docker run -d -p 443:443 --name tls-yolov3 myregistry.azurecr.io/tlsssyolov3:1`
+
+### Updating references into Topologies, to target the HTTPS inferencing container address
+The topology must define a YOLO inferencing:
+
+* Url Parameter
 ```
+      {
+        "name": "inferencingUrl",
+        "type": "String",
+        "description": "inferencing Url",
+        "default": "https://<REPLACE-WITH-IP-NAME>/score"
+      },
+```
+* Configuration
+```
+        "@type": "#Microsoft.Media.MediaGraphHttpExtension",
+        "name": "inferenceClient",
+        "endpoint": {
+          "@type": "#Microsoft.Media.MediaGraphTlsEndpoint",
+          "url": "${inferencingUrl}",
+          "credentials": {
+            "@type": "#Microsoft.Media.MediaGraphUsernamePasswordCredentials",
+            "username": "${inferencingUserName}",
+            "password": "${inferencingPassword}"
+          },
+          "validationOptions": {
+            "ignoreSignature": "true"
+          }
+        },
+```
+
+> "validationOptions": here we configure that for this particular endpoint, no Issuer signature validation will occur. This mechanism allows the self signed Certificate to bypass authentication. Otherwise, no traffic would flow through.
+
+## Testing
 
 Test the container using the following commands
 
@@ -72,7 +128,7 @@ Test the container using the following commands
 To get a list of detected objected using the following command
 
 ```bash
-   curl -X POST http://127.0.0.1/score -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg>
+   curl -X POST https://<REPLACE-WITH-IP-OR-NAME>/score -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg>
 ```
 
 If successful, you will see JSON printed on your screen that looks something like this
@@ -117,8 +173,8 @@ If successful, you will see JSON printed on your screen that looks something lik
 Terminate the container using the following docker commands
 
 ```bash
-docker stop my_yolo_container
-docker rm my_yolo_container
+docker stop tls-yolov3
+docker rm tls-yolov3
 ```
 
 ### /annotate
@@ -126,7 +182,7 @@ docker rm my_yolo_container
 To see the bounding boxes overlaid on the image run the following command
 
 ```bash
-   curl -X POST http://127.0.0.1/annotate -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg> --output out.jpeg
+   curl -X POST https://<REPLACE-WITH-IP-OR-NAME>/annotate -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg> --output out.jpeg
 ```
 
 If successful, you will see a file out.jpeg with bounding boxes overlaid on the input image.
@@ -136,13 +192,13 @@ If successful, you will see a file out.jpeg with bounding boxes overlaid on the 
 To get the list of detected objects and also generate an annotated image run the following command
 
 ```bash
-   curl -X POST http://127.0.0.1/score-debug -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg>
+   curl -X POST https://<REPLACE-WITH-IP-OR-NAME>/score-debug -H "Content-Type: image/jpeg" --data-binary @<image_file_in_jpeg>
 ```
 
 If successful, you will see a list of detected objected in JSON. The annotated image will be genereated in the /app/images directory inside the container. You can copy the images out to your host machine by using the following command
 
 ```bash
-   docker cp my_yolo_container:/app/images ./
+   docker cp tls-yolov3:/app/images ./
 ```
 
 The entire /images folder will be copied to ./images on your host machine. Image files have the following format dd_mm_yyyy_HH_MM_SS.jpeg
