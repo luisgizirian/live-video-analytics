@@ -1,8 +1,12 @@
 # Yolov3 ONNX model for encrypted through the wire I/O (TLS).
 
-*An alternative for scenarios where the YOLO inferencing container, will run separately from IoT Edge (i.e. you have a spare beefy (hardware capable) server you'd like to use for this intensive task; given the ammount of cameras you'll be feeding LVA with, which in turn, will demand simultaneous inferencing from this container). Although possible from a technical standpoint, if the inferencing container will run under IoT Edge's umbrella, a TLS certificate won't bring any added value. In this case, our suggestion is to walk the [regular documented path](../yolov3-onnx/readme.md)*
+*An alternative for scenarios where the YOLO inferencing container, will run separately from IoT Edge (i.e. you have a spare beefy (hardware capable) server you'd like to use for this intensive task; given the amount of cameras you'll be feeding LVA with, which in turn, will demand simultaneous inferencing from this container). Although possible from a technical standpoint, if the inferencing container will run under IoT Edge's umbrella, a TLS certificate won't bring any added value. In this case, our suggestion is to walk the [regular documented path](../yolov3-onnx/readme.md)*
 
-The following instruction will enable you to build a docker container with [Yolov3](http://pjreddie.com/darknet/yolo/) [ONNX](http://onnx.ai/) model using [nginx](https://www.nginx.com/), [gunicorn](https://gunicorn.org/), [flask](https://github.com/pallets/flask), and [runit](http://smarden.org/runit/). The container exposes port 443 to the outside world. We'll show two ways to deal with SSL certificates; BYO Certificate and Self Signed Certificate.
+The following instruction will enable you to build a docker container with [Yolov3](http://pjreddie.com/darknet/yolo/) [ONNX](http://onnx.ai/) model using [nginx](https://www.nginx.com/), [gunicorn](https://gunicorn.org/), [flask](https://github.com/pallets/flask), and [runit](http://smarden.org/runit/). The container exposes port 443 to the outside world.
+
+> Note that the SSL connection alone won't discriminate clients, allowing port access to services other than LVA. Mechanisms like username/password or http headers would help if necessary.
+
+We'll show two ways to deal with SSL certificates; BYO Certificate and Self Signed Certificate.
 
 Note: References to third-party software in this repo are for informational and convenience purposes only. Microsoft does not endorse nor provide rights for the third-party software. For more information on third-party software please see the links provided above.
 
@@ -27,7 +31,7 @@ First, create a `certs` directory where you'll copy the certificate files to. Th
 
 On the Host computer, run: `sudo mkdir /certs`
 
-In the newly created directory, copy the public/private key pair files (our sample expects `.pem` files. You'r reality might defer. In that case, use what you have)
+Copy the public and private key pair files to the newly created directory. Note that our sample uses .pem files which is the format recommended by LVA. Other formats can be used as well, provided the ignoreSignature property is true or that the certificate has been signed by a well-known CA.
 
 Reading material:
 
@@ -47,10 +51,10 @@ Let's decompose it a bit:
 
 * `-p 443:443`: it's up to you where you'd like to map the containers 443 port. You can pick whatever port fits your needs.
 * `--mount`: here's where the Host directory where we dropped the certificate files earlier, is binded into the container, so it's able to consume them.
-* `registry/image:tag`: replace this with the corresponding location/image:tag where you've pushed the image built fro `Dockerfile`
+* `registry/image:tag`: replace this with the corresponding location/image:tag where you've pushed the image built from the `Dockerfile`
 
 ### Updating references into Topologies, to target the HTTPS inferencing container address
-The topology must define a YOLO inferencing:
+The topology (i.e. https://github.com/Azure/live-video-analytics/blob/master/MediaGraph/topologies/evr-hubMessage-assets/topology.json) must define a YOLO inferencing:
 
 * Url Parameter
 ```
@@ -117,7 +121,7 @@ The topology must define a YOLO inferencing:
         },
 ```
 
-> "validationOptions": here we configure that for this particular endpoint, no Issuer signature validation will occur. This mechanism allows the self signed Certificate to bypass authentication. Otherwise, no traffic would flow through.
+> "validationOptions": here we configure that for this particular endpoint, no Issuer signature validation will occur. This mechanism allows the self signed Certificate to bypass authentication. Without it, the SSL connection would be rejected by LVA because the certificate is not trusted.
 
 ## Testing
 
