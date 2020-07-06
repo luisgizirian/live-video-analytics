@@ -105,6 +105,12 @@ The topology must define a YOLO inferencing:
 ```
 * Configuration
 ```
+{
+	"@apiVersion": "1.0",
+	"name": "TopologyName",
+	"properties": {
+    "processors": [
+      {
         "@type": "#Microsoft.Media.MediaGraphHttpExtension",
         "name": "inferenceClient",
         "endpoint": {
@@ -118,12 +124,16 @@ The topology must define a YOLO inferencing:
           "validationOptions": {
             "ignoreSignature": "true"
           }
-        },
+        }
+      }
+    ]
+  }
+}
 ```
 
 > "validationOptions": here we configure that for this particular endpoint, no Issuer signature validation will occur. This mechanism allows the self signed Certificate to bypass authentication. Without it, the SSL connection would be rejected by LVA because the certificate is not trusted.
 
-## Testing
+## Using the yolov3 container
 
 Test the container using the following commands
 
