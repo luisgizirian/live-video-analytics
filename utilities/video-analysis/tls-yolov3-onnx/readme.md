@@ -67,6 +67,12 @@ The topology (i.e. https://github.com/Azure/live-video-analytics/blob/master/Med
 ```
 * Configuration
 ```
+{
+	"@apiVersion": "1.0",
+	"name": "TopologyName",
+	"properties": {
+    "processors": [
+      {
         "@type": "#Microsoft.Media.MediaGraphHttpExtension",
         "name": "inferenceClient",
         "endpoint": {
@@ -78,6 +84,24 @@ The topology (i.e. https://github.com/Azure/live-video-analytics/blob/master/Med
             "password": "${inferencingPassword}"
           }
         },
+        "image": {
+          "scale":
+          {
+            "mode": "Pad",
+            "width": "416",
+            "height": "416"
+          },
+          "format":
+          {
+            "@type": "#Microsoft.Media.MediaGraphImageFormatEncoded",
+            "encoding": "jpeg",
+            "quality": "90"
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## The Self-Signed certificate way
@@ -123,6 +147,20 @@ The topology must define a YOLO inferencing:
           },
           "validationOptions": {
             "ignoreSignature": "true"
+          }
+        },
+        "image": {
+          "scale":
+          {
+            "mode": "Pad",
+            "width": "416",
+            "height": "416"
+          },
+          "format":
+          {
+            "@type": "#Microsoft.Media.MediaGraphImageFormatEncoded",
+            "encoding": "jpeg",
+            "quality": "90"
           }
         }
       }
