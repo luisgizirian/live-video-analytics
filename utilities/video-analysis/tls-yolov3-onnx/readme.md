@@ -1,4 +1,4 @@
-# Yolov3 ONNX model for encrypted through the wire I/O (TLS).
+# Yolov3 ONNX model for encryption through the wire I/O (TLS).
 
 *An alternative for scenarios where the YOLO inferencing container, will run separately from IoT Edge (i.e. you have a spare beefy (hardware capable) server you'd like to use for this intensive task; given the amount of cameras you'll be feeding LVA with, which in turn, will demand simultaneous inferencing from this container). Although possible from a technical standpoint, if the inferencing container will run under IoT Edge's umbrella, a TLS certificate won't bring any added value. In this case, our suggestion is to walk the [regular documented path](../yolov3-onnx/readme.md)*
 
@@ -25,7 +25,7 @@ Note: References to third-party software in this repo are for informational and 
 ### Involving the IT team in the process
 It's really important to involve the right areas here. The organization you're working for, might have it's own policies in place to deal with SSL certificates related issues, such as: naming, providers, TTL (time to live), among other not/technical ones.
 
-### Droping certificate files for docker container to pick them up
+### Dropping certificate files for docker container to pick them up
 
 First, create a `certs` directory where you'll copy the certificate files to. This directory will be mounted to the container, where the nginx config file expects it (more on this right after).
 
@@ -50,7 +50,7 @@ After getting a certificate, copying its pieces and updating the nginx configura
 Let's decompose it a bit:
 
 * `-p 443:443`: it's up to you where you'd like to map the containers 443 port. You can pick whatever port fits your needs.
-* `--mount`: here's where the Host directory where we dropped the certificate files earlier, is binded into the container, so it's able to consume them.
+* `--mount`: here the Host directory where we dropped the certificate files earlier, is bound into the container, so the image able to consume them.
 * `registry/image:tag`: replace this with the corresponding location/image:tag where you've pushed the image built from the `Dockerfile`
 
 ### Updating references into Topologies, to target the HTTPS inferencing container address
@@ -168,7 +168,7 @@ The topology must define a YOLO inferencing:
   }
 }
 ```
-
+> [!NOTE]  
 > "validationOptions": here we configure that for this particular endpoint, no Issuer signature validation will occur. This mechanism allows the self signed Certificate to bypass authentication. Without it, the SSL connection would be rejected by LVA because the certificate is not trusted.
 
 ## Using the yolov3 container
