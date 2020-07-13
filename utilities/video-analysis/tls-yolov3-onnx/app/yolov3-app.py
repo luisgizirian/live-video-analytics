@@ -162,7 +162,6 @@ def defaultPage():
 # This function returns a JSON object with inference duration and detected objects
 @app.route('/score', methods=['POST'])
 def score():
-
     try:
         imageData = io.BytesIO(request.get_data())
         # load the image
@@ -185,35 +184,57 @@ def score():
         print('EXCEPTION:', str(e))
         return Response(response='Error processing image', status= 500)
 
-# /score-debug routes to score_debug
-# This function scores the image and stores an annotated image for debugging purposes
-@app.route('/score-debug', methods=['POST'])
-def score_debug():
-
+# /score routes to scoring function 
+# This function returns a JSON object with inference duration and detected objects
+@app.route("/score", methods=['POST'])
+def score():
     try:
+        objectType = None
+        confidenceThreshold = 0.0
+
+        if (request.args):
+            try:
+                objectType = request.args.get('object')
+                stream = request.args.get('stream')
+                confidence = request.args.get('confidence')
+                if confidence is not None:
+                    confidenceThreshold = float(confidence)                
+            except Exception as ex:
+                print('EXCEPTION:', str(ex))                                
+
         imageData = io.BytesIO(request.get_data())
+
         # load the image
         img = Image.open(imageData)
 
-        inference_duration, detected_objects = processImage(img)
-        print('Inference duration was ', str(inference_duration))
+        inference_duration, detected_objects = processImage(img, objectType, confidenceThreshold)        
 
-        output_img = drawBboxes(img, detected_objects)
+        try:        
+            if stream is not None:
+                output_img = drawBboxes(img, detected_objects)
 
-        # datetime object containing current date and time
-        now = datetime.now()
-        
-        output_img_file = now.strftime("%d_%m_%Y_%H_%M_%S.jpeg")
-        output_img.save(output_dir + "/" + output_img_file)
+                imgBuf = io.BytesIO()
+                output_img.save(imgBuf, format='JPEG')
 
-        respBody = {                    
-                    "inferences" : detected_objects
-                    }                   
-        
-        return respBody
+                # post the image with bounding boxes so that it can be viewed as an MJPEG stream
+                postData = b'--boundary\r\n' + b'Content-Type: image/jpeg\r\n\r\n' + imgBuf.getvalue() + b'\r\n'
+                requests.post('http://127.0.0.1:80/mjpeg_pub/' + stream, data = postData)
+
+        except Exception as ex:
+            print('EXCEPTION:', str(ex))
+
+        if len(detected_objects) > 0:
+            respBody = {                    
+                        "inferences" : detected_objects
+                    }
+
+            respBody = json.dumps(respBody)
+            return Response(respBody, status= 200, mimetype ='application/json')
+        else:
+            return Response(status= 204)            
     except Exception as e:
         print('EXCEPTION:', str(e))
-        return Response(response='Error processing image', status= 500)
+        return Response(response='Error processing image ' + str(e), status= 500)
 
 # /annotate routes to annotation function 
 # This function returns an image with bounding boxes drawn around detected objects
