@@ -9,6 +9,7 @@ import io
 import json
 import os
 from datetime import datetime
+import requests
 
 # Imports for the REST API
 from flask import Flask, request, jsonify, Response
@@ -68,40 +69,51 @@ def preprocess(img):
     
     return image_data
 
-def postprocess(boxes, scores, indices, iw, ih):
+def postprocess(boxes, scores, indices, iw, ih, objectType=None, confidenceThreshold=0.0):
     
     detected_objects = []
     
     for idx_ in indices:
         idx_1 = (idx_[0], idx_[2])
+
+        objectTag = tags[idx_[1].tolist()]
+        confidence = scores[tuple(idx_)].tolist()
+
+        
         y1, x1, y2, x2 = boxes[idx_1].tolist()
 
-        x2 = (x2 - x1) / iw
-        y2 = (y2 - y1) / ih
-        x1 = x1 / iw
-        y1 = y1 / ih
+        width = (x2 - x1) / iw
+        height = (y2 - y1) / ih
+        left = x1 / iw
+        top = y1 / ih
         
         dobj = {
             "type" : "entity",
             "entity" : {
                 "tag" : {
-                    "value" : tags[idx_[1].tolist()],
-                    "confidence" : scores[tuple(idx_)].tolist()
+                    "value" : objectTag,
+                    "confidence" : confidence
                 },
                 "box" : {
-                    "l" : x1,
-                    "t" : y1,
-                    "w" : x2,
-                    "h" : y2
+                    "l" : left,
+                    "t" : top,
+                    "w" : width,
+                    "h" : height
                 }
             }
         }
+
+        if (objectType is None):
+            detected_objects.append(dobj)
+        else:
+            if (objectType == objectTag) and (confidence > confidenceThreshold):
+                detected_objects.append(dobj)
+
         
-        detected_objects.append(dobj)
         
     return detected_objects
 
-def processImage(img):
+def processImage(img, objectType=None, confidenceThreshold=0.0):
     try:
         # Preprocess input according to the functions specified above
         img_data = preprocess(img)
@@ -113,7 +125,7 @@ def processImage(img):
         inference_duration = np.round(inference_time_end - inference_time_start, 2)
         
         iw, ih = img.size
-        detected_objects = postprocess(boxes, scores, indices, iw, ih)
+        detected_objects = postprocess(boxes, scores, indices, iw, ih, objectType, confidenceThreshold)
         return inference_duration, detected_objects
 
     except Exception as e:
@@ -144,7 +156,7 @@ def drawBboxes(image, detected_objects):
         tag = entity['tag']
         objClass = tag['value']        
 
-        draw.rectangle((x1, y1, x2, y2), outline = 'blue', width = 2)
+        draw.rectangle((x1, y1, x2, y2), outline = 'blue', width = 1)
         print('rectangle drawn')
         draw.text((x1, y1), str(objClass), fill = "white", font = textfont)
      
@@ -158,31 +170,16 @@ app = Flask(__name__)
 def defaultPage():
     return Response(response='Hello from Yolov3 inferencing based on ONNX', status=200)
 
-# /score routes to scoring function 
-# This function returns a JSON object with inference duration and detected objects
-@app.route('/score', methods=['POST'])
-def score():
-    try:
-        imageData = io.BytesIO(request.get_data())
-        # load the image
-        img = Image.open(imageData)
+@app.route('/stream/<id>')
+def stream(id):
+    respBody = ("<html>"
+                "<h1>Stream with inferencing overlays</h1>"
+                "<img src=\"/mjpeg/" + id + "\"/>"
+                "</html>")
 
-        inference_duration, detected_objects = processImage(img)
-        print('Inference duration was ', str(inference_duration))
+    return Response(respBody, status= 200)
 
-        if len(detected_objects) > 0:
-            respBody = {                    
-                        "inferences" : detected_objects
-                    }
-
-            respBody = json.dumps(respBody)
-            return Response(respBody, status= 200, mimetype ='application/json')
-        else:
-            return Response(status= 204)
-
-    except Exception as e:
-        print('EXCEPTION:', str(e))
-        return Response(response='Error processing image', status= 500)
+    #return render_template('mjpeg.html')
 
 # /score routes to scoring function 
 # This function returns a JSON object with inference duration and detected objects
@@ -236,6 +233,36 @@ def score():
         print('EXCEPTION:', str(e))
         return Response(response='Error processing image ' + str(e), status= 500)
 
+# /score-debug routes to score_debug
+# This function scores the image and stores an annotated image for debugging purposes
+@app.route('/score-debug', methods=['POST'])
+def score_debug():
+
+    try:
+        imageData = io.BytesIO(request.get_data())
+        # load the image
+        img = Image.open(imageData)
+
+        inference_duration, detected_objects = processImage(img)
+        print('Inference duration was ', str(inference_duration))
+
+        output_img = drawBboxes(img, detected_objects)
+
+        # datetime object containing current date and time
+        now = datetime.now()
+        
+        output_img_file = now.strftime("%d_%m_%Y_%H_%M_%S.jpeg")
+        output_img.save(output_dir + "/" + output_img_file)
+
+        respBody = {                    
+                    "inferences" : detected_objects
+                    }                   
+        
+        return respBody
+    except Exception as e:
+        print('EXCEPTION:', str(e))
+        return Response(response='Error processing image', status= 500)
+
 # /annotate routes to annotation function 
 # This function returns an image with bounding boxes drawn around detected objects
 @app.route('/annotate', methods=['POST'])
@@ -260,7 +287,7 @@ def annotate():
         return Response(response='Error processing image', status= 500)
 
 
-# Load and intialize the model
+# Load and initialize the model
 init()
 
 if __name__ == '__main__':
