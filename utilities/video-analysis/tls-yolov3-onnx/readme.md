@@ -146,6 +146,7 @@ The topology must define a YOLO inferencing:
             "password": "${inferencingPassword}"
           },
           "validationOptions": {
+            "ignoreHostname": "true",
             "ignoreSignature": "true"
           }
         },
