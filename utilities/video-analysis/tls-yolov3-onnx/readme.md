@@ -43,7 +43,20 @@ Reading material:
 Set the right names for the certificate files, to match what you've copied to the `/certs` folder at Host computer level. The file you need to update is [yolov3-app.conf](yolov3-app.conf)
 
 ### Building, publishing and running the docker container
-After getting a certificate, copying its pieces and updating the nginx configuration file, now comes the time to put the container to work.
+
+Please update the contents for the nginx configuration file `yolo3-app.conf`.
+```
+    # Public
+    ssl_certificate /certs/<file-name>.pem;
+    # Private
+    ssl_certificate_key /certs/<file-name>-key.pem;
+```
+
+After getting a certificate, copying its pieces and updating the nginx configuration file, you're ready to begin the image building process.
+
+To build the image, use the docker file named `Dockerfile`.
+
+To put the container to work, run:
 
 `sudo docker run -d -p 443:443 --name tls-yolov3 --mount type=bind,source=/certs,target=/certs myregistry.azurecr.io/secureyolov3:1`
 
@@ -111,7 +124,9 @@ Shorter, yes. Use it wisely and consider that real-world production scenarios, m
 With that data, head to the [Dockerfile (for Self-Signed)](Dockerfile.ss), and replace where's indicated.
 
 ### Building, publishing and running the docker container
-After getting a certificate, copying its pieces and updating the nginx configuration file, now comes the time to put the container to work.
+To build the image, use the docker file named `Dockerfile.ss`.
+
+To put the container to work, run:
 
 `sudo docker run -d -p 443:443 --name tls-yolov3 myregistry.azurecr.io/tlsssyolov3:1`
 
