@@ -56,7 +56,24 @@ After getting a certificate, copying its pieces and updating the nginx configura
 
 To build the image, use the docker file named `Dockerfile`.
 
-To put the container to work, run:
+First, a couple assumptions
+
+* We'll be using Azure Container Registry (ACR) to publish our image before distributing it
+* Our local docker is already loged into ACR.
+* Our hypothetical ACR name is "myregistry". Your may defer, so please update it properly along the following commands.
+
+> If you're unfamiliar with ACR or have any questions, please follow this [demo on building and pushing an image into ACR](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli).
+
+`cd` onto the repo's root directory
+```
+sudo docker build --pull --rm -f "utilities/video-analysis/tls-yolov3-onnx/Dockerfile" -t secureyolov3:latest "utilities/video-analysis/tls-yolov3-onnx"
+
+sudo docker tag secureyolov3:latest myregistry.azurecr.io/secureyolov3:1
+
+sudo docker push myregistry.azurecr.io/secureyolov3:1
+```
+
+Then, from the box where the container should execute, run this command:
 
 `sudo docker run -d -p 443:443 --name tls-yolov3 --mount type=bind,source=/certs,target=/certs myregistry.azurecr.io/secureyolov3:1`
 
@@ -126,7 +143,24 @@ With that data, head to the [Dockerfile (for Self-Signed)](Dockerfile.ss), and r
 ### Building, publishing and running the docker container
 To build the image, use the docker file named `Dockerfile.ss`.
 
-To put the container to work, run:
+First, a couple assumptions
+
+* We'll be using Azure Container Registry (ACR) to publish our image before distributing it
+* Our local docker is already loged into ACR.
+* Our hypothetical ACR name is "myregistry". Your may defer, so please update it properly along the following commands.
+
+> If you're unfamiliar with ACR or have any questions, please follow this [demo on building and pushing an image into ACR](https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli).
+
+`cd` onto the repo's root directory
+```
+sudo docker build --pull --rm -f "utilities/video-analysis/tls-yolov3-onnx/Dockerfile.ss" -t tlsssyolov3:latest "utilities/video-analysis/tls-yolov3-onnx"
+
+sudo docker tag tlsssyolov3:latest myregistry.azurecr.io/tlsssyolov3:1
+
+sudo docker push myregistry.azurecr.io/tlsssyolov3:1
+```
+
+Then, from the box where the container should execute, run this command:
 
 `sudo docker run -d -p 443:443 --name tls-yolov3 myregistry.azurecr.io/tlsssyolov3:1`
 
